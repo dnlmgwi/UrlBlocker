@@ -1,35 +1,37 @@
 // background.js
 
 // Listener for when the extension is installed or updated
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(() => {
     console.log('URL Blocker Extension installed.');
+    // Fetch URLs from your server
+    fetch('https://run.mocky.io/v3/cd8a0d55-23ab-4888-9c84-25754dd14f50').then(response => response.json())
+        .then(data => {
+            console.log(data);
+            // Validate and sanitize data here
+            const validUrls = data.filter(url => isValidUrl(url)); // Implement isValidUrl
 
-    try {
-        // Fetch URLs from your server
-        const response = await fetch('https://run.mocky.io/v3/cd8a0d55-23ab-4888-9c84-25754dd14f50');
-        const urls = await response.json();
+            // Store the URLs in local storage
+            chrome.storage.local.set({ 'blockedUrls': validUrls }, function () {
+                console.log('URLs are saved locally.');
+            });
 
-        console.log(urls);
+            // Update the `declarativeNetRequest` rules
+            updateBlockingRules(validUrls);
 
-        // Store the URLs in local storage
-        chrome.storage.local.set({ 'blockedUrls': urls }, function () {
-            console.log('URLs are saved locally.');
+
+            // Initialize or update your extension's settings, if necessary
+            // For example, you might want to set up initial blocking rules here
+            // using chrome.declarativeNetRequest.updateDynamicRules if they are not static.
+
+            // Fetch URLs and update rules on startup
+            fetchStoredUrls(function (validUrls) {
+                console.log("Fetching Store Urls");
+                updateBlockingRules(validUrls);
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching URLs:', error);
         });
-
-        // Update the `declarativeNetRequest` rules
-        updateBlockingRules(urls);
-    } catch (error) {
-        console.error('Error fetching URLs:', error);
-    }
-
-    // Initialize or update your extension's settings, if necessary
-    // For example, you might want to set up initial blocking rules here
-    // using chrome.declarativeNetRequest.updateDynamicRules if they are not static.
-    // Fetch URLs and update rules on startup
-    fetchStoredUrls(function (urls) {
-        console.log("Fetching Store Urls");
-        updateBlockingRules(urls);
-    });
 });
 
 function updateBlockingRules(urls) {
@@ -55,7 +57,14 @@ function fetchStoredUrls(callback) {
     });
 }
 
-
+function isValidUrl(string) {
+    try {
+        new URL(string);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
 
 // Listen for changes in local storage
 chrome.storage.onChanged.addListener(function (changes, namespace) {
